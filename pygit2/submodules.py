@@ -173,9 +173,9 @@ class SubmoduleCollection:
         Raises KeyError if there is no such submodule.
         """
         csub = ffi.new('git_submodule **')
-        cpath = ffi.new('char[]', to_bytes(name))
+        cname = ffi.new('char[]', to_bytes(name))
 
-        err = C.git_submodule_lookup(csub, self._repository._repo, cpath)
+        err = C.git_submodule_lookup(csub, self._repository._repo, cname)
         check_error(err)
         return Submodule._from_c(self._repository, csub[0])
 
@@ -183,7 +183,7 @@ class SubmoduleCollection:
         return self.get(name) is not None
 
     def __iter__(self) -> Iterator[Submodule]:
-        for s in self._repository.listall_submodules():
+        for s in self._repository.listall_submodule_names():
             yield self[s]
 
     def get(self, name: str) -> Union[Submodule, None]:
@@ -276,7 +276,7 @@ class SubmoduleCollection:
             Flag indicating if initialization should overwrite submodule entries.
         """
         if submodules is None:
-            submodules = self._repository.listall_submodules()
+            submodules = self._repository.listall_submodule_names()
 
         instances = [self[s] for s in submodules]
 
@@ -316,7 +316,7 @@ class SubmoduleCollection:
             The default is 0 (full commit history).
         """
         if submodules is None:
-            submodules = self._repository.listall_submodules()
+            submodules = self._repository.listall_submodule_names()
 
         instances = [self[s] for s in submodules]
 

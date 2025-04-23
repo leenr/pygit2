@@ -34,7 +34,7 @@ from . import utils
 from pygit2.enums import SubmoduleIgnore as SI, SubmoduleStatus as SS
 
 
-SUBM_NAME = 'TestGitRepository'
+SUBM_NAME = 'TestSubmodule'
 SUBM_PATH = 'TestGitRepository'
 SUBM_URL = 'https://github.com/libgit2/TestGitRepository'
 SUBM_HEAD_SHA = '49322bb17d3acc9146f98c97d078513228bbf3c0'
@@ -47,11 +47,28 @@ def repo(tmp_path):
         yield pygit2.Repository(path)
 
 
-def test_lookup_submodule(repo):
+def test_lookup_submodule_byname(repo):
+    s = repo.submodules[SUBM_NAME]
+    assert s is not None
+    assert s.name == SUBM_NAME
+    assert s.path == SUBM_PATH
+
+    s = repo.submodules.get(SUBM_NAME)
+    assert s is not None
+    assert s.name == SUBM_NAME
+    assert s.path == SUBM_PATH
+
+
+def test_lookup_submodule_bypath(repo):
     s = repo.submodules[SUBM_PATH]
     assert s is not None
+    assert s.name == SUBM_NAME
+    assert s.path == SUBM_PATH
+
     s = repo.submodules.get(SUBM_PATH)
     assert s is not None
+    assert s.name == SUBM_NAME
+    assert s.path == SUBM_PATH
 
 
 def test_lookup_submodule_aspath(repo):
@@ -71,6 +88,12 @@ def test_listall_submodules(repo):
     assert submodules[0] == SUBM_PATH
 
 
+def test_listall_submodule_names(repo):
+    submodules = repo.listall_submodule_names()
+    assert len(submodules) == 1
+    assert submodules[0] == SUBM_NAME
+
+
 def test_contains_submodule(repo):
     assert SUBM_PATH in repo.submodules
     assert 'does-not-exist' not in repo.submodules
@@ -84,7 +107,7 @@ def test_submodule_iterator(repo):
 
 @utils.requires_network
 def test_submodule_open(repo):
-    s = repo.submodules[SUBM_PATH]
+    s = repo.submodules[SUBM_NAME]
     repo.submodules.init()
     repo.submodules.update()
     r = s.open()
@@ -98,7 +121,7 @@ def test_submodule_open_from_repository_subclass(repo):
         pass
 
     custom_repo = CustomRepoClass(repo.workdir)
-    s = custom_repo.submodules[SUBM_PATH]
+    s = custom_repo.submodules[SUBM_NAME]
     custom_repo.submodules.init()
     custom_repo.submodules.update()
     r = s.open()
@@ -107,26 +130,26 @@ def test_submodule_open_from_repository_subclass(repo):
 
 
 def test_name(repo):
-    s = repo.submodules[SUBM_PATH]
+    s = repo.submodules[SUBM_NAME]
     assert SUBM_NAME == s.name
 
 
 def test_path(repo):
-    s = repo.submodules[SUBM_PATH]
+    s = repo.submodules[SUBM_NAME]
     assert SUBM_PATH == s.path
 
 
 def test_url(repo):
-    s = repo.submodules[SUBM_PATH]
+    s = repo.submodules[SUBM_NAME]
     assert SUBM_URL == s.url
 
 
 def test_missing_url(repo):
     # Remove "url" from .gitmodules
     with open(Path(repo.workdir, '.gitmodules'), 'wt') as f:
-        f.write('[submodule "TestGitRepository"]\n')
+        f.write('[submodule "TestSubmodule"]\n')
         f.write('\tpath = TestGitRepository\n')
-    s = repo.submodules[SUBM_PATH]
+    s = repo.submodules[SUBM_NAME]
     assert not s.url
 
 
@@ -151,8 +174,8 @@ def test_init_and_update(repo):
 def test_specified_update(repo):
     subrepo_file_path = Path(repo.workdir) / SUBM_PATH / 'master.txt'
     assert not subrepo_file_path.exists()
-    repo.submodules.init(submodules=['TestGitRepository'])
-    repo.submodules.update(submodules=['TestGitRepository'])
+    repo.submodules.init(submodules=['TestSubmodule'])
+    repo.submodules.update(submodules=['TestSubmodule'])
     assert subrepo_file_path.exists()
 
 
@@ -160,7 +183,7 @@ def test_specified_update(repo):
 def test_update_instance(repo):
     subrepo_file_path = Path(repo.workdir) / SUBM_PATH / 'master.txt'
     assert not subrepo_file_path.exists()
-    sm = repo.submodules['TestGitRepository']
+    sm = repo.submodules['TestSubmodule']
     sm.init()
     sm.update()
     assert subrepo_file_path.exists()
@@ -207,7 +230,7 @@ def test_oneshot_update_instance(repo, depth):
 
 @utils.requires_network
 def test_head_id(repo):
-    assert repo.submodules[SUBM_PATH].head_id == SUBM_HEAD_SHA
+    assert repo.submodules[SUBM_NAME].head_id == SUBM_HEAD_SHA
 
 
 @utils.requires_network
@@ -254,24 +277,24 @@ def test_submodule_status(repo):
     common_status = SS.IN_HEAD | SS.IN_INDEX | SS.IN_CONFIG
 
     # Submodule needs initializing
-    assert repo.submodules.status(SUBM_PATH) == common_status | SS.WD_UNINITIALIZED
+    assert repo.submodules.status(SUBM_NAME) == common_status | SS.WD_UNINITIALIZED
 
     # If ignoring ALL, don't look at WD
-    assert repo.submodules.status(SUBM_PATH, ignore=SI.ALL) == common_status
+    assert repo.submodules.status(SUBM_NAME, ignore=SI.ALL) == common_status
 
     # Update the submodule
     repo.submodules.update(init=True)
 
     # It's in our WD now
-    assert repo.submodules.status(SUBM_PATH) == common_status | SS.IN_WD
+    assert repo.submodules.status(SUBM_NAME) == common_status | SS.IN_WD
 
     # Open submodule repo
-    sm_repo: pygit2.Repository = repo.submodules[SUBM_PATH].open()
+    sm_repo: pygit2.Repository = repo.submodules[SUBM_NAME].open()
 
     # Move HEAD in the submodule (WD_MODIFIED)
     sm_repo.checkout('refs/tags/annotated_tag')
     assert (
-        repo.submodules.status(SUBM_PATH) == common_status | SS.IN_WD | SS.WD_MODIFIED
+        repo.submodules.status(SUBM_NAME) == common_status | SS.IN_WD | SS.WD_MODIFIED
     )
 
     # Move HEAD back to master
@@ -289,7 +312,7 @@ def test_submodule_status(repo):
     with open(Path(repo.workdir, SUBM_PATH, 'some_untracked_file.txt'), 'wt') as f:
         f.write('hi')
     assert (
-        repo.submodules.status(SUBM_PATH)
+        repo.submodules.status(SUBM_NAME)
         == common_status | SS.IN_WD | SS.WD_WD_MODIFIED | SS.WD_UNTRACKED
     )
 
@@ -297,7 +320,7 @@ def test_submodule_status(repo):
     sm_repo.index.add_all()
     sm_repo.index.write()
     assert (
-        repo.submodules.status(SUBM_PATH)
+        repo.submodules.status(SUBM_NAME)
         == common_status | SS.IN_WD | SS.WD_INDEX_MODIFIED
     )
 
@@ -323,7 +346,7 @@ def test_submodule_reload(repo):
 
     # Doctor the config file outside of libgit2
     with open(Path(repo.workdir, '.gitmodules'), 'wt') as f:
-        f.write('[submodule "TestGitRepository"]\n')
+        f.write('[submodule "TestSubmodule"]\n')
         f.write('\tpath = TestGitRepository\n')
         f.write('\turl = https://github.com/libgit2/pygit2\n')
 
